@@ -1,35 +1,58 @@
-version: '2'
+version: '3'
 services:
   db:
-    image: postgres:15
-    user: root
+    image: postgres:15-bullseye
+    restart: always
+    shm_size: 256mb
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=odoo
-      - POSTGRES_PASSWORD=odoo16@2022      
+      - POSTGRES_PASSWORD=P@ssw0rd
       - POSTGRES_DB=postgres
-    restart: always             # run as a service
-    volumes:
-        - ./postgresql:/var/lib/postgresql/data
-
-  odoo16:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    command: |
+      postgres
+        -c shared_preload_libraries=pg_stat_statements
+        -c pg_stat_statements.track=all
+        -c max_connections=200
+        -c shared_buffers=256MB
+        -c effective_cache_size=8GB
+        -c work_mem=16MB
+        -c maintenance_work_mem=128MB
+        -c min_wal_size=128MB
+        -c max_wal_size=2GB
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=16MB
+        -c default_statistics_target=100
+  pgadmin:
+    image: dpage/pgadmin4:6
+    restart: always
+    ports:
+      - 8080:80
+      - 18080:443
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=P@ssw0rd
+  odoo:
     image: odoo:16
+    platform: linux/amd64
     user: root
     depends_on:
       - db
     ports:
-      - "10016:8069"
-      - "20016:8072" # live chat
+      - "8069:8069"
+      - "8072:8072" # live chat
     tty: true
     command: --
-    environment:
-      - HOST=db
-      - USER=odoo
-      - PASSWORD=odoo16@2022
     volumes:
       #- /etc/timezone:/etc/timezone:ro
       #- /etc/localtime:/etc/localtime:ro
       # - ./entrypoint.sh:/entrypoint.sh   # if you want to install additional Python packages, uncomment this line!
       - ./addons:/mnt/extra-addons
       - ./etc:/etc/odoo
-    restart: always             # run as a service
-    
+    restart: always # run as a service
